@@ -1,5 +1,5 @@
 TOOL.Category = "Constraints"
-TOOL.Name = "Advanced Bonemerge"
+TOOL.Name = "#tool.advbonemerge.name"
 TOOL.Command = nil
 TOOL.ConfigName = "" 
 
@@ -14,16 +14,15 @@ TOOL.Information = {
 }
 
 if CLIENT then
-	language.Add("tool.advbonemerge.name", "Advanced Bonemerge")
+	language.Add("tool.advbonemerge.name", "Bonemerge")
 	language.Add("tool.advbonemerge.desc", "Attach models to things and customize how they're attached")
-	//language.Add("tool.advbonemerge.help", "bonemerging is pretty great")
 
 	language.Add("tool.advbonemerge.info1", "Use the context menu to edit attached models")
 	language.Add("tool.advbonemerge.left1", "Attach models to the selected object")
 	language.Add("tool.advbonemerge.right01", "Select an object to attach models to")
 	language.Add("tool.advbonemerge.rightuse01", "Select yourself")
 
-	language.Add("undone_AdvBonemerge", "Undone Advanced Bonemerge")
+	language.Add("undone_AdvBonemerge", "Undone Bonemerge")
 end
 
 local ConstraintsToPreserve = {

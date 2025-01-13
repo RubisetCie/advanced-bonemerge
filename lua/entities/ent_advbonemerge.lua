@@ -1,7 +1,7 @@
 AddCSLuaFile()
 
 ENT.Base 			= "base_gmodentity"
-ENT.PrintName			= "Advanced Bonemerge Entity"
+ENT.PrintName			= "Bonemerge Entity"
 
 ENT.Spawnable			= false
 ENT.AdminSpawnable		= false
