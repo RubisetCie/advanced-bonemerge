@@ -994,7 +994,7 @@ if CLIENT then
 
 	function TOOL.BuildCPanel(panel)
 
-		panel:AddControl("Header", {Description = "#tool.advbonemerge.desc"})
+		panel:Help( "#tool.advbonemerge.desc" )
 
 		panel.modellist = vgui.Create("DTree", panel)
 		panel.modellist:SetHeight(150)
@@ -1565,10 +1565,11 @@ if CLIENT then
 
 		end
 
-		panel.bonelist = panel:AddControl("ListBox", {
-			Label = "Bone", 
-			Height = 300,
-		})
+		panel.bonelist = vgui.Create( "DListView" )
+		panel.bonelist:AddColumn( "Bone" )
+		panel.bonelist:SetMultiSelect( false )
+		panel.bonelist:SetTall(300)
+		panel.bonelist:SortByColumn(1, false)
 
 		panel.bonelist.Bones = {}
 		panel.bonelist.selectedbone = -2
@@ -1659,7 +1660,9 @@ if CLIENT then
 			end
 
 		end
-		panel.bonelist.OnRowSelected = function() end  //get rid of the default OnRowSelected function created by the AddControl function
+		panel.bonelist.OnRowSelected = function() end
+		panel:AddItem( panel.bonelist )
+
 		panel.bonemanipcontainer = vgui.Create("DForm", panel)
 		panel.bonemanipcontainer.Paint = function()
 			surface.SetDrawColor(Color(0,0,0,70))
@@ -1970,13 +1973,11 @@ if CLIENT then
 		panel.checkbox_scaletarget = checkbox
 
 		panel.bonemanipcontainer:Toggle()  //bonemanip options should be hidden by default since no entity is selected
-		panel:AddControl("Label", {Text = ""})
 
-		panel:AddControl("Checkbox", {Label = "Merge matching bones by default", Command = "advbonemerge_matchnames"})
-		//panel:ControlHelp("If enabled. newly attached models start off with all bones following the parent model's bones with matching names, like a normal bonemerge.")
+		panel:CheckBox( "Merge matching bones by default", "advbonemerge_matchnames" )
 		panel:ControlHelp("If on. newly attached models start off with all bones following the bones with matching names, like a normal bonemerge.")
 
-		panel:AddControl("Checkbox", {Label = "Draw selection halo", Command = "advbonemerge_drawhalo"})
+		panel:CheckBox( "Draw selection halo", "advbonemerge_drawhalo" )
 
 	end
 
