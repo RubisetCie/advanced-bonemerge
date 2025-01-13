@@ -8,9 +8,6 @@ ENT.AdminSpawnable		= false
 
 ENT.RenderGroup			= false //let the engine set the rendergroup by itself
 
-
-
-
 function ENT:Initialize()
 
 	if SERVER then
@@ -197,9 +194,6 @@ if CLIENT then
 			return
 		end
 
-
-
-
 		//Create a table of default bone offsets for bones to use when they're not merged to something
 		if !self.AdvBone_DefaultBoneOffsets then
 			//Grab the bone matrices from a clientside model instead - if we use ourselves, any bone manips we already have will be applied to the 
@@ -278,9 +272,6 @@ if CLIENT then
 			self.csmodeltoremove = self.csmodel
 			self.csmodel = nil
 		end
-
-
-
 
 		//self.AdvBone_BoneInfo structure:
 		//self.AdvBone_BoneInfo[0] = {	     //one entry for each of our bones, by bone id
@@ -468,7 +459,6 @@ if CLIENT then
 
 			end
 
-
 			if matr then  //matr can be nil if we're visible but our parent isn't
 
 				//Store a non-scaled version of our angles if we're scaling
@@ -478,7 +468,6 @@ if CLIENT then
 				end
 				//Apply scale manip
 				matr:Scale(scale)
-
 
 				if !self.AdvBone_BoneHitBoxes then //used by bloat
 					local ourscale = matr:GetScale()
@@ -621,9 +610,6 @@ if CLIENT then
 	end
 end
 
-
-
-
 //Boneinfo networking - 
 //Step 1: If we're the client and we don't have a boneinfo table, request it from the server.
 //Step 2: If we're the server and we receive a request, send a boneinfo table.
@@ -646,7 +632,6 @@ if SERVER then
 
 	util.AddNetworkString("AdvBone_EntBoneInfoTable_GetFromSv")
 	util.AddNetworkString("AdvBone_EntBoneInfoTable_SendToCl")
-
 
 	//If we received a request for a boneinfo table, then send it to the client
 	net.Receive("AdvBone_EntBoneInfoTable_GetFromSv", function(_, ply)
@@ -761,7 +746,6 @@ if CLIENT then
 			ent.LastBoneChangeTime = CurTime()
 		end
 	end)
-
 
 	function ENT:Think()
 
@@ -968,7 +952,6 @@ if CLIENT then
 				local ourscale = matr:GetScale()
 				self.AdvBone_RenderBounds_HighestBoneScale = math.max(ourscale.x,ourscale.y,ourscale.z)
 
-
 				//Save the retrievable matrix now, before we have to change a bunch of stuff to get it to work with EnableMatrix
 				self.AdvBone_StaticPropMatrix = Matrix()
 				self.AdvBone_StaticPropMatrix:Set(matr)
@@ -1011,7 +994,6 @@ if CLIENT then
 			end
 		end
 
-
 		//Set the render bounds
 		if !parent or !self.AdvBone_RenderBounds_BoneMins or !self.AdvBone_RenderBounds_HighestBoneScale then return end
 		if IsStaticProp or !(self.LastBoneChangeTime + (FrameTime() * 10) < curtime) then //same check as BuildBonePosition's "skip" - don't update this stuff if the bones haven't moved in a while
@@ -1038,12 +1020,9 @@ if CLIENT then
 			end
 		end
 
-
 		self:NextThink(curtime)
-		//return true
 
 	end
-
 
 	local AdvBone_IsSkyboxDrawing = false
 
@@ -1108,18 +1087,14 @@ if CLIENT then
 	//
 	//end
 
-
 end
-
-
-
 
 if SERVER then
 
 	//"Unmerge" function - uses the info saved to self.AdvBone_UnmergeInfo to reconstruct the original entity that was bonemerged, and then removes us
 
 	function ENT:Unmerge(ply)
-	
+
 		if !IsValid(self) then return end
 		if !self:GetBoneCount() then return end
 		local parent = self:GetParent()
@@ -1300,7 +1275,7 @@ if SERVER then
 			self:Remove()
 
 			return newent
-		end	
+		end
 
 	end
 
@@ -1313,7 +1288,6 @@ if SERVER then
 			parent:SetName("")
 			parent.AdvBone_PlaceholderName = nil
 		end
-
 
 		//Detect whether we're in the 3D skybox, and network that to clients to use in the Draw function because they can't detect it themselves
 		//(sky_camera ent is serverside only and ent:IsEFlagSet(EFL_IN_SKYBOX) always returns false)
@@ -1329,9 +1303,6 @@ if SERVER then
 	end
 
 end
-
-
-
 
 if SERVER then
 	//When NPCs die and create a serverside ragdoll, then transfer over advbonemerged ents to the ragdoll
@@ -1366,9 +1337,6 @@ if SERVER then
 		end
 	end)
 end
-
-
-
 
 duplicator.RegisterEntityClass("ent_advbonemerge", function(ply, data)
 
@@ -1413,15 +1381,6 @@ duplicator.RegisterEntityClass("ent_advbonemerge", function(ply, data)
 	return dupedent
 
 end, "Data")
-
-
-
-
-
-
-
-
-
 
 
 //FUNCTION REDIRECTS:
@@ -1493,7 +1452,7 @@ if old_ManipulateBonePosition then
 		end
 		if !(ent:GetClass() == "ent_advbonemerge" or ent:GetClass() == "prop_animated") then
 			return old_ManipulateBonePosition(ent, boneID, pos, networking, ...)  //this doesn't usually return anything, but it's possible some other addon has overriden the function
-		end									      //so it does, so let it return just in case
+		end
 	end
 end
 
@@ -1522,9 +1481,6 @@ if old_GetManipulateBonePosition then
 	end
 end
 
-
-
-
 //Angle functions
 local old_ManipulateBoneAngles = meta.ManipulateBoneAngles
 if old_ManipulateBoneAngles then
@@ -1550,7 +1506,7 @@ if old_ManipulateBoneAngles then
 		end
 		if !(ent:GetClass() == "ent_advbonemerge" or ent:GetClass() == "prop_animated") then
 			return old_ManipulateBoneAngles(ent, boneID, ang, networking, ...)  //this doesn't usually return anything, but it's possible some other addon has overriden the function
-		end									    //so it does, so let it return just in case
+		end
 	end
 end
 
@@ -1579,9 +1535,6 @@ if old_GetManipulateBoneAngles then
 	end
 end
 
-
-
-
 //Scale functions
 local old_ManipulateBoneScale = meta.ManipulateBoneScale
 if old_ManipulateBoneScale then
@@ -1606,7 +1559,7 @@ if old_ManipulateBoneScale then
 		//if !(ent:GetClass() == "ent_advbonemerge" or ent:GetClass() == "prop_animated") then
 		if !(ent:GetClass() == "ent_advbonemerge" or (ent:GetClass() == "prop_animated" and ent:GetBoneName(boneID) != "static_prop")) then  //static_prop animprops should still use garrymanips for scale
 			return old_ManipulateBoneScale(ent, boneID, scale, ...)  //this doesn't usually return anything, but it's possible some other addon has overriden the function
-		end								 //so it does, so let it return just in case
+		end
 	end
 end
 
@@ -1635,9 +1588,6 @@ if old_GetManipulateBoneScale then
 	end
 end
 
-
-
-
 //Misc.
 local old_HasBoneManipulations = meta.HasBoneManipulations
 if old_HasBoneManipulations then
@@ -1649,9 +1599,6 @@ if old_HasBoneManipulations then
 		end
 	end
 end
-
-
-
 
 //Also wake up the BuildBonePositions function when changing the angle of an entity's physobjs. This fixes small rotations done with the Ragdoll Mover tool not waking up things advhonemerged to it.
 //Currently only doing this for SetAngles and not SetPos because it doesn't seem to be necessary.
@@ -1668,11 +1615,8 @@ if old_SetAngles then
 			end
 		end
 		return old_SetAngles(physobj, angles, ...)  //this doesn't usually return anything, but it's possible some other addon has overriden the function
-	end						    //so it does, so let it return just in case
+	end
 end
-
-
-
 
 //As it turns out, the game absolutely WILL store and even network ent:ManipulateBoneX(-1) (what we use for model origin manips) even though it's not a valid bone. 
 //However, entity saving glosses over it since it only searches bones 0 and onward, so we have to save the information ourselves:
@@ -1682,22 +1626,20 @@ function ENT:OnEntityCopyTableFinish(data)
 	data.BoneManip = data.BoneManip or {}
 
 	local t = {}
-			
+
 	local s = self:GetManipulateBoneScale(-1)
 	local a = self:GetManipulateBoneAngles(-1)
 	local p = self:GetManipulateBonePosition(-1)
-			
+
 	if ( s != Vector(1, 1, 1) ) then t[ 's' ] = s end //scale
 	if ( a != angle_zero ) then t[ 'a' ] = a end //angle
 	if ( p != vector_origin ) then t[ 'p' ] = p end //position
-		
+
 	if ( table.Count( t ) > 0 ) then
 		data.BoneManip[-1] = t
 	end
 
-
 	data.AdvBone_BoneManips = nil //don't save this table, everything in it has already been saved in Data.BoneManip by the duplicator save function
-
 
 	//Store DisableBeardFlexifier nwbool
 	data.DisableBeardFlexifier = self:GetNWBool("DisableBeardFlexifier")

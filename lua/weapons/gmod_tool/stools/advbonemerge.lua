@@ -11,7 +11,6 @@ TOOL.Information = {
 	{name = "left1", stage = 1, icon = "gui/lmb.png"},
 	{name = "right01", icon = "gui/rmb.png"},
 	{name = "rightuse01", icon = "gui/rmb.png", icon2 = "gui/e.png"},
-	//{name = "reload01", icon = "gui/r.png"},
 }
 
 if CLIENT then
@@ -23,13 +22,9 @@ if CLIENT then
 	language.Add("tool.advbonemerge.left1", "Attach models to the selected object")
 	language.Add("tool.advbonemerge.right01", "Select an object to attach models to")
 	language.Add("tool.advbonemerge.rightuse01", "Select yourself")
-	//language.Add("tool.advbonemerge.reload01", "I don't think we'll be using reload for this tool")
 
 	language.Add("undone_AdvBonemerge", "Undone Advanced Bonemerge")
 end
-
-
-
 
 local ConstraintsToPreserve = {
 	["AdvBoneMerge"] = true,
@@ -78,10 +73,8 @@ if SERVER then
 			end
 		end
 
-
 		local oldent = target
 		if oldent.AttachedEntity then oldent = oldent.AttachedEntity end
-
 
 		local newent = ents.Create("ent_advbonemerge")
 		newent:SetPos(parent:GetPos())
@@ -167,7 +160,6 @@ if SERVER then
 		duplicator.ApplyEntityModifiers(ply, newent)
 		duplicator.ApplyBoneModifiers(ply, newent)
 
-
 		//Get all of the constraints directly attached to target that we DON'T want to convert into new bonemerges. Copy them over to newent.
 		local targetconsts = constraint.GetTable(target)
 		for k, const in pairs (targetconsts) do
@@ -215,16 +207,12 @@ if SERVER then
 			end
 		end
 
-
 		AdvBoneExposeBonesToClient(newent)
 		return newent
 
 	end
 
 end
-
-
-
 
 function TOOL:LeftClick(trace)
 
@@ -240,7 +228,6 @@ function TOOL:LeftClick(trace)
 		local newent = CreateAdvBonemergeEntity(trace.Entity, par, ply, false, false, matchnames)
 		if !IsValid(newent) then return end
 
-
 		//"Merge via constraint":
 		//Get all of the entities directly and indirectly constrained to trace.Entity, not including the ones connected by those same constraints we searched for earlier.
 		//Bonemerge them to newent, and use ManipulateBonePosition/Angle to store their pos/ang offsets relative to newent.
@@ -250,11 +237,11 @@ function TOOL:LeftClick(trace)
 	
 			if ( !IsValid( ent ) ) then return end
 			if ( ResultTable[ ent ] ) then return end
-	
+
 			ResultTable[ ent ] = ent
-	
+
 			local ConTable = constraint.GetTable( ent )
-	
+
 			for k, con in ipairs( ConTable ) do
 				if !ConstraintsToPreserve[con.Type] then
 					for EntNum, Ent in pairs( con.Entity ) do
@@ -315,7 +302,6 @@ function TOOL:LeftClick(trace)
 			end
 		end
 
-
 		//Apply the adv bonemerge constraint
 		local const = constraint.AdvBoneMerge(par, newent, ply)
 
@@ -365,8 +351,6 @@ if CLIENT then
 	end)
 end
 
-
-
 function TOOL:RightClick(trace)
 
 	if CLIENT then return true end
@@ -387,9 +371,6 @@ function TOOL:RightClick(trace)
 
 end
 
-
-
-
 function TOOL:Think()
 
 	if CLIENT then
@@ -398,7 +379,6 @@ function TOOL:Think()
 
 		local panel = controlpanel.Get("advbonemerge")
 		if !panel or !panel.modellist then return end
-
 
 		//Store a reference to our toolgun in the panel table so it can change our NWvars
 		if !panel.ToolgunObj or panel.ToolgunObj != self:GetWeapon() then panel.ToolgunObj = self:GetWeapon() end
@@ -425,9 +405,6 @@ function TOOL:GetStage()
 	end
 
 end
-
-
-
 
 function TOOL:DrawHUD()
 
@@ -479,15 +456,12 @@ function TOOL:DrawHUD()
 
 end
 
-
-
-
 if SERVER then
 
 	function constraint.AdvBoneMerge( Ent1, Ent2, ply )
 
 		if !Ent1 or !Ent2 then return end
-		
+
 		//create a dummy ent for the constraint functions to use
 		local Constraint = ents.Create("info_target")//("logic_collision_pair")
 		Constraint:Spawn()
@@ -517,7 +491,7 @@ if SERVER then
 				end, Ent2, ply)
 			end
 		end)
-		
+
 		Ent2:SetPos(Ent1:GetPos())
 		Ent2:SetAngles(Ent1:GetAngles())
 		Ent2:SetParent(Ent1)
@@ -531,22 +505,21 @@ if SERVER then
 		AdvBoneSetLightingOrigin(Ent1,Ent2)
 
 		constraint.AddConstraintTable( Ent1, Constraint, Ent2 )
-		
-		local ctable  = 
+
+		local ctable =
 		{
 			Type  = "AdvBoneMerge",
 			Ent1  = Ent1,
 			Ent2  = Ent2,
 			ply   = ply,
 		}
-	
+
 		Constraint:SetTable( ctable )
-	
+
 		return Constraint
 
 	end
 	duplicator.RegisterConstraint("AdvBoneMerge", constraint.AdvBoneMerge, "Ent1", "Ent2", "ply")
-
 
 	function AdvBoneSetLightingOrigin(Ent1,Ent2)
 
@@ -574,14 +547,14 @@ if SERVER then
 		//Now get everything already bonemerged to Ent2 and change their lighting origin from Ent2 to the topmost parent.
 		local function GetAllAdvBonemergedEntities(ent, ResultTable)
 			local ResultTable = ResultTable or {}
-	
+
 			if ( !IsValid( ent ) ) then return end
 			if ( ResultTable[ ent ] ) then return end
-	
+
 			ResultTable[ ent ] = ent
-	
+
 			local ConTable = constraint.GetTable(ent)
-	
+
 			for k, con in ipairs( ConTable ) do
 				if con.Type == "AdvBoneMerge" then
 					for EntNum, Ent in pairs( con.Entity ) do
@@ -599,7 +572,6 @@ if SERVER then
 
 	end
 
-
 	function AdvBoneExposeBonesToClient(ent)  //serverside only, ironically
 		//Have a dummy ent use FollowBone to expose all of the entity's bones. If we don't do this, a whole bunch of bones can return as invalid clientside.
 		if ent.AttachedEntity then ent = ent.AttachedEntity end
@@ -614,9 +586,6 @@ if SERVER then
 	end
 
 end
-
-
-
 
 //note 10/15/14: this is now duplicated code in both advbone and animpropoverhaul, lame
 //(used by cpanel options to wake up buildbonepositions now that bonemanips don't always do that)
@@ -723,8 +692,6 @@ if SERVER then
 		end
 	end)
 
-
-
 	//AdvBone_CPanelInput_SendToSv structure:
 	//	Entity: Target entity
 	//	Int(4): Input id
@@ -803,7 +770,7 @@ if SERVER then
 					net.WriteEntity(newent)
 				net.Send(ply)
 			end)
-		
+
 			ent:Remove()
 
 		elseif input == 2 then //face poser select
@@ -892,8 +859,6 @@ if SERVER then
 		end
 	end)
 
-
-
 	//AdvBone_BoneManipPaste_SendToSv structure:
 	//	Entity: Entity to modify
 	//
@@ -960,8 +925,6 @@ if SERVER then
 		end
 	end)
 
-
-
 	util.AddNetworkString("AdvBone_EntBoneInfoTableUpdate_SendToCl")
 end
 
@@ -974,9 +937,6 @@ if CLIENT then
 
 		ent.AdvBone_BoneInfo_Received = false
 	end)
-
-
-
 
 	local function SendBoneManipToServer()
 
@@ -995,7 +955,6 @@ if CLIENT then
 		local newrot = Angle( panel.slider_rot_p:GetValue(), panel.slider_rot_y:GetValue(), panel.slider_rot_r:GetValue() )
 		local newscale = Vector( panel.slider_scale_x:GetValue(), panel.slider_scale_y:GetValue(), panel.slider_scale_z:GetValue() )
 
-
 		//First, apply the new BoneInfo clientside
 		if !panel.UpdatingBoneManipOptions and ent != NULL and entbone != -2 then
 			if ent.AdvBone_BoneInfo and ent.AdvBone_BoneInfo[entbone] then
@@ -1012,7 +971,6 @@ if CLIENT then
 				ent.AdvBone_BoneInfo[entbone]["scale"] = newscaletarget
 			end
 		end
-
 
 		//Then, send all of the information to the server so the duplicator can pick it up
 		net.Start("AdvBone_ToolBoneManip_SendToSv")
@@ -1035,16 +993,9 @@ if CLIENT then
 
 	end
 
-
-
-
 	function TOOL.BuildCPanel(panel)
 
-		//panel:AddControl("Header", {Description = "#tool.advbonemerge.help"})
 		panel:AddControl("Header", {Description = "#tool.advbonemerge.desc"})
-
-
-
 
 		panel.modellist = vgui.Create("DTree", panel)
 		panel.modellist:SetHeight(150)
@@ -1377,7 +1328,7 @@ if CLIENT then
 												net.WriteEntity(modelent)
 												net.WriteUInt(9, 4) //input id 9
 											net.SendToServer()
-		
+
 											surface.PlaySound("common/wpn_select.wav")
 										end)
 										option:SetImage("icon16/arrow_turn_left.png")
@@ -1387,7 +1338,7 @@ if CLIENT then
 												net.WriteEntity(modelent)
 												net.WriteUInt(10, 4) //input id 10
 											net.SendToServer()
-		
+
 											surface.PlaySound("common/wpn_select.wav")
 										end)
 										option:SetImage("icon16/arrow_turn_right.png")
@@ -1615,9 +1566,6 @@ if CLIENT then
 
 		end
 
-
-
-
 		panel.bonelist = panel:AddControl("ListBox", {
 			Label = "Bone", 
 			Height = 300,
@@ -1667,14 +1615,14 @@ if CLIENT then
 								if self.Icon then
 									self.Icon:SetImage("icon16/tick.png")
 								end
-  								surface.SetDrawColor(0,255,0,35)
+								surface.SetDrawColor(0,255,0,35)
 							else
 								if self.Icon then
 									self.Icon:SetImage("icon16/cross.png")
 								end
 					  			surface.SetDrawColor(255,0,0,35)
 							end
-    							surface.DrawRect(0, 0, w, h)
+								surface.DrawRect(0, 0, w, h)
 						end
 
 						local img = vgui.Create("DImage", line)
@@ -1713,24 +1661,18 @@ if CLIENT then
 
 		end
 		panel.bonelist.OnRowSelected = function() end  //get rid of the default OnRowSelected function created by the AddControl function
-
-
-
-
 		panel.bonemanipcontainer = vgui.Create("DForm", panel)
 		panel.bonemanipcontainer.Paint = function()
 			surface.SetDrawColor(Color(0,0,0,70))
-    			surface.DrawRect(0, 0, panel.bonemanipcontainer:GetWide(), panel.bonemanipcontainer:GetTall())
+			surface.DrawRect(0, 0, panel.bonemanipcontainer:GetWide(), panel.bonemanipcontainer:GetTall())
 		end
 		panel.bonemanipcontainer.Header:SetTall(0)
 		panel:AddPanel(panel.bonemanipcontainer)
-
 
 		panel.UpdatingBoneManipOptions = false
 		panel.UpdateBoneManipOptions = function(ent,boneid)
 			//Don't let the options accidentally update anything while we're changing their values like this
 			panel.UpdatingBoneManipOptions = true
-
 
 			//hide all the bonemanip options if we're not using them
 			if ent != NULL and boneid != -2 then
@@ -1741,7 +1683,6 @@ if CLIENT then
 				if panel.bonemanipcontainer:GetExpanded() == true then panel.bonemanipcontainer:Toggle() end
 				panel.bonemanipcontainer:GetParent():SetTall(panel.bonemanipcontainer:GetTall())
 			end
-
 
 			if ent != NULL and boneid != -2 then
 				local trans = ent:GetManipulateBonePosition(boneid)
@@ -1819,10 +1760,8 @@ if CLIENT then
 			panel.targetbonelist.PopulateTargetBoneList(ent,boneid)
 			SendBoneManipToServer()  //Make sure the NWvars update even if none of the sliders were changed
 
-
 			panel.UpdatingBoneManipOptions = false
 		end
-
 
 		//Target Bone
 		panel.targetbonelist = vgui.Create("DComboBox", panel.targetbonelist)
@@ -1837,7 +1776,6 @@ if CLIENT then
 		panel.targetbonelist.PopulateTargetBoneList = function(ent,boneid)
 
 			panel.targetbonelist:Clear()
-
 
 			if ent == NULL then return end
 			parent = ent:GetParent()
@@ -1901,8 +1839,6 @@ if CLIENT then
 
 			self.Menu = DermaMenu( false, self )
 
-
-
 			for k, v in SortedPairs( self.Choices ) do
 				local option = self.Menu:AddOption( v, function() self:ChooseOption( v, k ) end )
 				if panel.targetbonelist.selectedtargetbone == (k - 2) then option:SetChecked(true) end  //check the currently selected target bone
@@ -1914,9 +1850,7 @@ if CLIENT then
 			self.Menu:Open( x, y, false, self )
 		end
 
-
 		panel.bonemanipcontainer:Help("")
-
 
 		//Function overrides for sliders to unclamp them
 		local function SliderValueChangedUnclamped( self, val )
@@ -1935,14 +1869,13 @@ if CLIENT then
 		local function SliderSetValueUnclamped( self, val )
 			//don't clamp this
 			//val = math.Clamp( tonumber( val ) || 0, self:GetMin(), self:GetMax() )
-	
+
 			if ( self:GetValue() == val ) then return end
 
 			self.Scratch:SetValue( val )
 
 			self:ValueChanged( self:GetValue() )
 		end
-
 
 		//Translation
 		local slider = panel.bonemanipcontainer:NumSlider("Move X", nil, -128, 128, 2)
@@ -1969,9 +1902,7 @@ if CLIENT then
 		slider:SetDefaultValue(0.00)
 		panel.slider_trans_z = slider
 
-
 		panel.bonemanipcontainer:Help("")
-
 
 		//Rotation
 		local slider = panel.bonemanipcontainer:NumSlider("Pitch", nil, -180, 180, 2)
@@ -1992,9 +1923,7 @@ if CLIENT then
 		slider:SetDefaultValue(0.00)
 		panel.slider_rot_r = slider
 
-
 		panel.bonemanipcontainer:Help("")
-
 
 		//Scale
 		local slider = panel.bonemanipcontainer:NumSlider("Scale X", nil, 0, 20, 2)
@@ -2041,15 +1970,8 @@ if CLIENT then
 		checkbox.OnChange = function() SendBoneManipToServer() end
 		panel.checkbox_scaletarget = checkbox
 
-
 		panel.bonemanipcontainer:Toggle()  //bonemanip options should be hidden by default since no entity is selected
-
-
-
-
 		panel:AddControl("Label", {Text = ""})
-
-
 
 		panel:AddControl("Checkbox", {Label = "Merge matching bones by default", Command = "advbonemerge_matchnames"})
 		//panel:ControlHelp("If enabled. newly attached models start off with all bones following the parent model's bones with matching names, like a normal bonemerge.")
