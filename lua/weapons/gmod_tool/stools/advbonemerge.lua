@@ -1975,7 +1975,7 @@ if CLIENT then
 		panel.bonemanipcontainer:Toggle()  //bonemanip options should be hidden by default since no entity is selected
 
 		panel:CheckBox( "Merge matching bones by default", "advbonemerge_matchnames" )
-		panel:ControlHelp("If on. newly attached models start off with all bones following the bones with matching names, like a normal bonemerge.")
+		panel:ControlHelp("If on, newly attached models start off with all bones following the bones with matching names, like a normal bonemerge.")
 
 		panel:CheckBox( "Draw selection halo", "advbonemerge_drawhalo" )
 
