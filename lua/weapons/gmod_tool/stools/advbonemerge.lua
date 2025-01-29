@@ -34,6 +34,13 @@ local ConstraintsToPreserve = {
 	["CompositeEntities_Constraint"] = true, //Composite Bonemerge addon
 }
 
+local IsValid = IsValid
+local CurTime = CurTime
+local controlpanel = controlpanel
+local draw = draw
+local halo = halo
+local math = math
+
 if SERVER then
 
 	function CreateAdvBonemergeEntity(target, parent, ply, alwaysreplace, keepparentempty, matchnames)

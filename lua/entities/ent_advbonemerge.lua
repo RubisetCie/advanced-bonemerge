@@ -8,6 +8,11 @@ ENT.AdminSpawnable		= false
 
 ENT.RenderGroup			= false //let the engine set the rendergroup by itself
 
+local IsValid = IsValid
+local CurTime = CurTime
+local net = net
+local math = math
+
 function ENT:Initialize()
 
 	if SERVER then
@@ -789,7 +794,6 @@ if CLIENT then
 			self.csmodeltoremove = nil
 		end
 
-
 		//Workaround: If our model has only a single bone named "static_prop", then the BuildBonePositions callback won't run, so we can't move the bone the usual way. Instead, do 
  		//some trickery here with ApplyMatrix, where we work with a matrix for the single bone (actually an origin control in disguise) using a stripped-down version of our
 		//BuildBonePositions function, and then apply that matrix to the entire model.
@@ -804,7 +808,6 @@ if CLIENT then
 				self.AdvBone_RenderBounds_BoneMins = Vector(0,0,0)
 				self.AdvBone_RenderBounds_BoneMaxs = Vector(0,0,0)
 			end
-
 
 			if !IsValid(self) then return end
 			if !self.AdvBone_BoneInfo then return end
@@ -826,7 +829,6 @@ if CLIENT then
 			//scaling a matrix down can distort its angles (or remove them entirely if scaled down to 0), so whenever we scale a matrix, we'll store its non-scaled angles in here
 			//first. whenever another bone wants to follow that matrix but NOT scale with it, it'll use the stored angles from this table instead.
 			self.AdvBone_Angs = {}  
-
 
 			local matr = nil
 			local targetboneid = parent:LookupBone(self.AdvBone_BoneInfo[0].parent)
