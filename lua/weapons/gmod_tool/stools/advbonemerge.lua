@@ -34,12 +34,19 @@ local ConstraintsToPreserve = {
 	["CompositeEntities_Constraint"] = true, //Composite Bonemerge addon
 }
 
+local Angle = Angle
+local Vector = Vector
 local IsValid = IsValid
 local CurTime = CurTime
 local controlpanel = controlpanel
+local surface = surface
 local draw = draw
 local halo = halo
 local math = math
+local angle_zero = angle_zero
+local vector_origin = vector_origin
+local color_white = color_white
+local color_black = color_black
 
 if SERVER then
 
@@ -454,9 +461,9 @@ function TOOL:DrawHUD()
 			local _pos = _pos:ToScreen()
 			local textpos = {x = _pos.x+5,y = _pos.y-5}
 
-			draw.RoundedBox(0,_pos.x - 2,_pos.y - 2,4,4,Color(0,0,0,255))
-			draw.RoundedBox(0,_pos.x - 1,_pos.y - 1,2,2,Color(255,255,255,255))
-			draw.SimpleTextOutlined(_name,"Default",textpos.x,textpos.y,Color(255,255,255,255),TEXT_ALIGN_LEFT,TEXT_ALIGN_BOTTOM,1,Color(0,0,0,255))
+			draw.RoundedBox(0,_pos.x - 2,_pos.y - 2,4,4,color_black)
+			draw.RoundedBox(0,_pos.x - 1,_pos.y - 1,2,2,color_white)
+			draw.SimpleTextOutlined(_name,"Default",textpos.x,textpos.y,color_white,TEXT_ALIGN_LEFT,TEXT_ALIGN_BOTTOM,1,color_black)
 		end
 	end
 
@@ -723,13 +730,13 @@ if SERVER then
 			HitGroup = 0,
 			HitNoDraw = false,
 			HitNonWorld = true,
-			HitNormal = Vector(0,0,0),
+			HitNormal = vector_origin,
 			HitPos = ent:GetPos(),
 			HitSky = false,
 			HitTexture = "**studio**",
 			HitWorld = false,
 			MatType	= MAT_DEFAULT,
-			Normal = Vector(0,0,1),
+			Normal = vector_up,
 			PhysicsBone = 0,
 			StartPos = ent:GetPos(),
 			StartSolid = true,
@@ -1235,13 +1242,13 @@ if CLIENT then
 								HitGroup = 0,
 								HitNoDraw = false,
 								HitNonWorld = true,
-								HitNormal = Vector(0,0,0),
+								HitNormal = vector_origin,
 								HitPos = modelent:GetPos(),
 								HitSky = false,
 								HitTexture = "**studio**",
 								HitWorld = false,
 								MatType	= MAT_DEFAULT,
-								Normal = Vector(0,0,1),
+								Normal = vector_up,
 								PhysicsBone = 0,
 								StartPos = modelent:GetPos(),
 								StartSolid = true,
@@ -1544,6 +1551,8 @@ if CLIENT then
 
 		end
 
+		local color_trans = Color(0,0,0,70)
+
 		panel.modellist.PopulateModelList = function(ent)
 
 			//Remove all of the nodes from the modellist
@@ -1672,7 +1681,7 @@ if CLIENT then
 
 		panel.bonemanipcontainer = vgui.Create("DForm", panel)
 		panel.bonemanipcontainer.Paint = function()
-			surface.SetDrawColor(Color(0,0,0,70))
+			surface.SetDrawColor(color_trans)
 			surface.DrawRect(0, 0, panel.bonemanipcontainer:GetWide(), panel.bonemanipcontainer:GetTall())
 		end
 		panel.bonemanipcontainer.Header:SetTall(0)

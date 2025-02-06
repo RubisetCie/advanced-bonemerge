@@ -1,6 +1,6 @@
 AddCSLuaFile()
 
-ENT.Base 			= "base_gmodentity"
+ENT.Base				= "base_gmodentity"
 ENT.PrintName			= "Bonemerge Entity"
 
 ENT.Spawnable			= false
@@ -8,10 +8,14 @@ ENT.AdminSpawnable		= false
 
 ENT.RenderGroup			= false //let the engine set the rendergroup by itself
 
+local Angle = Angle
+local Vector = Vector
 local IsValid = IsValid
 local CurTime = CurTime
 local net = net
 local math = math
+local angle_zero = angle_zero
+local vector_origin = vector_origin
 
 function ENT:Initialize()
 
@@ -239,8 +243,8 @@ if CLIENT then
 					end
 				end
 				if !newentry["posoffset"] then
-					newentry["posoffset"] = Vector(0,0,0)
-					newentry["angoffset"] = Angle(0,0,0)
+					newentry["posoffset"] = vector_origin
+					newentry["angoffset"] = angle_zero
 				end
 				table.insert(defaultboneoffsets, i, newentry)
 
@@ -805,8 +809,8 @@ if CLIENT then
 			if !self.AdvBone_RenderBounds_Bloat then
 				local modelmins, modelmaxs = self:GetModelRenderBounds()
 				self.AdvBone_RenderBounds_Bloat = math.max(0, -modelmins.x, -modelmins.y, -modelmins.z, modelmaxs.x, modelmaxs.y, modelmaxs.z) * 1.75 //because of the rendermultiply method we're using for the matrix, the bounds will never actually rotate, so make sure the bounds are big enough that nothing sticks through when we rotate the model
-				self.AdvBone_RenderBounds_BoneMins = Vector(0,0,0)
-				self.AdvBone_RenderBounds_BoneMaxs = Vector(0,0,0)
+				self.AdvBone_RenderBounds_BoneMins = vector_origin
+				self.AdvBone_RenderBounds_BoneMaxs = vector_origin
 			end
 
 			if !IsValid(self) then return end
