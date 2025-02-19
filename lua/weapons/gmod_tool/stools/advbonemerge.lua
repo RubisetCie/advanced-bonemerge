@@ -35,6 +35,7 @@ local ConstraintsToPreserve = {
 	["AdvBoneMerge"] = true,
 	["AttachParticleControllerBeam"] = true, //Advanced Particle Controller addon
 	["PartCtrl_Ent"] = true, //ParticleControlOverhaul
+	["PartCtrl_SpecialEffect"] = true, //ParticleControlOverhaul
 	["BoneMerge"] = true, //Bone Merger addon
 	["EasyBonemerge"] = true, //Easy Bonemerge Tool addon
 	["CompositeEntities_Constraint"] = true, //Composite Bonemerge addon
@@ -173,16 +174,22 @@ if SERVER then
 		for k, const in pairs (targetconsts) do
 			if const.Entity then
 				if ConstraintsToPreserve[const.Type] then
+					//PrintTable(const)
+
 					//If any of the values in the constraint table are target, switch them over to newent
 					for key, val in pairs (const) do
 						if val == target then 
 							const[key] = newent
 						//Transfer over bonemerged ents from other addons' bonemerge constraints, and make sure they don't get DeleteOnRemoved
-						elseif (const.Type == "EasyBonemerge" or const.Type == "CompositeEntities_Constraint" or const.Type == "PartCtrl_Ent") //doesn't work for BoneMerge, bah
+						elseif (const.Type == "EasyBonemerge" or const.Type == "CompositeEntities_Constraint" 
+						or const.Type == "PartCtrl_Ent" or const.Type == "PartCtrl_SpecialEffect") //doesn't work for BoneMerge, bah
 						and isentity(val) and IsValid(val) and val:GetParent() == target then
-							//MsgN("reparenting ", val:GetModel())
+							//MsgN("reparenting ", val:GetModel(), " ", val, " to ", newent)
 							if const.Type == "CompositeEntities_Constraint" then
 								val:SetParent(newent)
+							elseif const.Type == "PartCtrl_SpecialEffect" then
+								val:SetParent(newent)
+								val:SetSpecialEffectParent(newent)
 							end
 							target:DontDeleteOnRemove(val)
 						end
@@ -199,15 +206,19 @@ if SERVER then
 						entstab[const.Entity[tabnum].Index] = const.Entity[tabnum].Entity
 					end
 
-					if const.Type == "PartCtrl_Ent" and IsValid(const.Ent1) then
+					if const.Type == "PartCtrl_Ent" or const.Type == "PartCtrl_SpecialEffect" and IsValid(const.Ent1) then
 						target:DontDeleteOnRemove(const.Ent1) //Make sure we also clear deleteonremove for unparented cpoints
-						//Tell clients to retrieve the updated info table (the constraint func will change the relevant value to point to our ent)
-						timer.Simple(0.1, function() //do this on a timer, otherwise the advbonemerge ent might not exist on the client yet when they receive the new table
-							net.Start("PartCtrl_InfoTableUpdate_SendToCl")
-								net.WriteEntity(const.Ent1)
-							net.Broadcast()
-						end)
+						if const.Type == "PartCtrl_Ent" then
+							//Tell clients to retrieve the updated info table (the constraint func will change the relevant value to point to our ent)
+							timer.Simple(0.1, function() //do this on a timer, otherwise the advbonemerge ent might not exist on the client yet when they receive the new table
+								net.Start("PartCtrl_InfoTableUpdate_SendToCl")
+									net.WriteEntity(const.Ent1)
+								net.Broadcast()
+							end)
+						end
 					end
+
+					//MsgN("")
 
 					//Now copy the constraint over to newent
 					duplicator.CreateConstraintFromTable(const, entstab)
