@@ -29,6 +29,7 @@ local ConstraintsToPreserve = {
 	["AdvBoneMerge"] = true,
 	["AttachParticleControllerBeam"] = true, //Advanced Particle Controller addon
 	["PartCtrl_Ent"] = true, //ParticleControlOverhaul
+	["PartCtrl_SpecialEffect"] = true, //ParticleControlOverhaul
 	["BoneMerge"] = true, //Bone Merger addon
 	["EasyBonemerge"] = true, //Easy Bonemerge Tool addon
 	["CompositeEntities_Constraint"] = true, //Composite Bonemerge addon
@@ -120,6 +121,8 @@ if SERVER then
 		newent.AdvBone_BoneManips = oldent.AdvBone_BoneManips or {} //this overrides the garrymanips to prevent discrepancies caused by a manip being set back to 0 in one table, but not another
 		//Copy over DisableBeardFlexifier, just in case we're an unmerged ent that inherited this value
 		newent:SetNWBool("DisableBeardFlexifier", oldent:GetNWBool("DisableBeardFlexifier"))
+		//Store a value if we're a merged ParticleControlOverhaul grip point
+		newent.PartCtrl_MergedGrip = oldent.PartCtrl_Grip
 
 		//Create a BoneInfo table - this is used to store bone manipulation info other than the standard Position/Angle/Scale values already available by default
 		local boneinfo = {}
@@ -178,16 +181,22 @@ if SERVER then
 		for k, const in pairs (targetconsts) do
 			if const.Entity then
 				if ConstraintsToPreserve[const.Type] then
+					//PrintTable(const)
+
 					//If any of the values in the constraint table are target, switch them over to newent
 					for key, val in pairs (const) do
 						if val == target then 
 							const[key] = newent
 						//Transfer over bonemerged ents from other addons' bonemerge constraints, and make sure they don't get DeleteOnRemoved
-						elseif (const.Type == "EasyBonemerge" or const.Type == "CompositeEntities_Constraint" or const.Type == "PartCtrl_Ent") //doesn't work for BoneMerge, bah
+						elseif (const.Type == "EasyBonemerge" or const.Type == "CompositeEntities_Constraint" 
+						or const.Type == "PartCtrl_Ent" or const.Type == "PartCtrl_SpecialEffect") //doesn't work for BoneMerge, bah
 						and isentity(val) and IsValid(val) and val:GetParent() == target then
-							//MsgN("reparenting ", val:GetModel())
+							//MsgN("reparenting ", val:GetModel(), " ", val, " to ", newent)
 							if const.Type == "CompositeEntities_Constraint" then
 								val:SetParent(newent)
+							elseif const.Type == "PartCtrl_SpecialEffect" then
+								val:SetParent(newent)
+								val:SetSpecialEffectParent(newent)
 							end
 							target:DontDeleteOnRemove(val)
 						end
@@ -204,15 +213,19 @@ if SERVER then
 						entstab[const.Entity[tabnum].Index] = const.Entity[tabnum].Entity
 					end
 
-					if const.Type == "PartCtrl_Ent" and IsValid(const.Ent1) then
+					if const.Type == "PartCtrl_Ent" or const.Type == "PartCtrl_SpecialEffect" and IsValid(const.Ent1) then
 						target:DontDeleteOnRemove(const.Ent1) //Make sure we also clear deleteonremove for unparented cpoints
-						//Tell clients to retrieve the updated info table (the constraint func will change the relevant value to point to our ent)
-						timer.Simple(0.1, function() //do this on a timer, otherwise the advbonemerge ent might not exist on the client yet when they receive the new table
-							net.Start("PartCtrl_InfoTableUpdate_SendToCl")
-								net.WriteEntity(const.Ent1)
-							net.Broadcast()
-						end)
+						if const.Type == "PartCtrl_Ent" then
+							//Tell clients to retrieve the updated info table (the constraint func will change the relevant value to point to our ent)
+							timer.Simple(0.1, function() //do this on a timer, otherwise the advbonemerge ent might not exist on the client yet when they receive the new table
+								net.Start("PartCtrl_InfoTableUpdate_SendToCl")
+									net.WriteEntity(const.Ent1)
+								net.Broadcast()
+							end)
+						end
 					end
+
+					//MsgN("")
 
 					//Now copy the constraint over to newent
 					duplicator.CreateConstraintFromTable(const, entstab)
@@ -322,7 +335,21 @@ function TOOL:LeftClick(trace)
 		undo.Create("AdvBonemerge")
 			undo.AddEntity(const)  //the constraint entity will unmerge newent upon being removed
 			undo.SetPlayer(ply)
-		undo.Finish("Adv. Bonemerge (" .. tostring(newent:GetModel()) .. ")")
+		local nodename = newent:GetModel()
+		if newent.PartCtrl_MergedGrip then
+			//Merged particle effects display the name of the particle instead
+			nodename = "particle" //placeholder in case this fails somehow
+			local tab = constraint.FindConstraint(newent, "PartCtrl_Ent")
+			if istable(tab) and IsValid(tab.Ent1) and tab.Ent1.PartCtrl_Ent then
+				nodename = tab.Ent1:GetParticleName()
+			else
+				local tab = constraint.FindConstraint(newent, "PartCtrl_SpecialEffect")
+				if istable(tab) and IsValid(tab.Ent1) and tab.Ent1.PartCtrl_SpecialEffect then
+					nodename = tab.Ent1.PrintName
+				end
+			end
+		end
+		undo.Finish("Adv. Bonemerge (" .. nodename .. ")")
 
 		//Tell the client to add the new model to the controlpanel's model list - do this on a timer so the entity isn't still null on the client's end
 		timer.Simple(0.1, function()
@@ -1035,12 +1062,53 @@ if CLIENT then
 					modelent:InvalidateBoneCache()
 
 					local nodename = string.StripExtension( string.GetFileFromFilename( modelent:GetModel() ) )
+					local doparticlenamethink = false
+					local function DoParticleNodeName(k)
+						//ParticleControlOverhaul grip points display the name of the particle instead
+						if istable(modelent.PartCtrl_ParticleEnts) then
+							for k, _ in pairs (modelent.PartCtrl_ParticleEnts) do
+								if k.GetParticleName and istable(k.ParticleInfo) then
+									nodename = k:GetParticleName()
+									doparticlenamethink = false
+									//If the particle has multiple position cpoints, then add this cpoint's number to the nodename,
+									//to tell them apart in case we merge more than one of them
+									local points = 0
+									local point_num = nil
+									for k2, v2 in pairs (k.ParticleInfo) do
+										if v2.ent != nil then
+											points = points + 1
+											if point_num == nil and v2.ent == modelent then
+												point_num = k2
+											end
+										end
+									end
+									if points > 1 then
+										nodename = nodename .. " Pt. #" .. point_num
+									end
+								else
+									nodename = k.PrintName
+									doparticlenamethink = false
+								end
+								break //grip point ents should only have a single particle effect attached
+							end
+						end
+					end
 					if modelent:GetClass() == "prop_animated" then
 						nodename = nodename .. " (animated)"
+					elseif modelent.PartCtrl_Grip or modelent:GetNWBool("PartCtrl_MergedGrip") then
+						doparticlenamethink = true
+						DoParticleNodeName()
+						//If we weren't able to get the particle name yet, then give it a placeholder name until the think func can replace it
+						if doparticlenamethink then
+							nodename = "(particle)"
+						end
 					end
-
 					local node = parent:AddNode(nodename)
 					local nodeseticon = function(skinid) //this is a function so we can update the icon skin when using the skin utility
+						if modelent.PartCtrl_Grip or modelent:GetNWBool("PartCtrl_MergedGrip") then
+							node.Icon:SetImage("icon16/fire.png")
+							return
+						end
 						local modelicon = "spawnicons/" .. string.StripExtension(modelent:GetModel()) .. ".png"
 						if file.Exists("materials/" .. modelicon, "GAME") then
 							node.Icon:SetImage(modelicon)
@@ -1522,6 +1590,13 @@ if CLIENT then
 									end
 								end
 							end
+						elseif doparticlenamethink then
+							//If the node's entity is a ParticleControlOverhaul grip point that hasn't networked the necessary 
+							//info to the client yet, then keep trying until we have it and can set the name properly.
+							DoParticleNodeName()
+							if !doparticlenamethink then
+								node:SetText(nodename)
+							end
 						end
 					end
 
@@ -1772,6 +1847,29 @@ if CLIENT then
 				else
 					panel.checkbox_scaletarget:SetDisabled(true)
 					panel.checkbox_scaletarget:SetTooltip("Option not available for this entity")
+				end
+
+				//gray out the scale sliders for particle grips
+				local function SetSliderDisabled(slider, disable)
+					if disable then
+						slider:SetMouseInputEnabled(false)
+						slider:SetAlpha(75)
+					else
+						slider:SetMouseInputEnabled(true)
+						slider:SetAlpha(255)
+					end
+				end
+				if ent.PartCtrl_Grip or ent:GetNWBool("PartCtrl_MergedGrip") then
+					SetSliderDisabled(panel.slider_scale_x, true)
+					SetSliderDisabled(panel.slider_scale_y, true)
+					SetSliderDisabled(panel.slider_scale_z, true)
+					SetSliderDisabled(panel.slider_scale_xyz, true)
+					//keep the "scale with parent" check enabled, since that still makes our position manip (and our children) scale with our target bone
+				else
+					SetSliderDisabled(panel.slider_scale_x, false)
+					SetSliderDisabled(panel.slider_scale_y, false)
+					SetSliderDisabled(panel.slider_scale_z, false)
+					SetSliderDisabled(panel.slider_scale_xyz, false)
 				end
 			end
 
