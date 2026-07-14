@@ -53,6 +53,40 @@ local vector_origin = vector_origin
 
 if SERVER then
 
+	function CreateAdvBoneInfoTable(target, par, keepparentempty, matchnames)
+		local oldent = target
+		if oldent.AttachedEntity then oldent = oldent.AttachedEntity end
+
+		local boneinfo = {}
+		for i = -1, oldent:GetBoneCount() - 1 do
+			local newsubtable = {
+				parent = "",
+				//scale = !hasscalemanip, //If the ent we converted has any scale manips, then turn this off by default so the manips look the same as they did before
+				scale = true //never mind, the above functionality is unintuitive, and just leaves people wondering why "scale with target" is defaulting to false
+			}
+
+			if target.AdvBone_BoneInfo and target.AdvBone_BoneInfo[i] then
+				newsubtable.scale = target.AdvBone_BoneInfo[i].scale
+			end
+
+			if !keepparentempty then
+				if target.AdvBone_BoneInfo and target.AdvBone_BoneInfo[i]
+				and ( par:LookupBone( target.AdvBone_BoneInfo[i].parent ) or target.AdvBone_BoneInfo[i].parent == "" ) then
+					//If oldent was unmerged and already has a BoneInfo table for us to use, then get the value from it, but only if the listed target bone exists/is an empty string
+					newsubtable.parent = target.AdvBone_BoneInfo[i].parent
+				elseif matchnames and i != -1 and par:LookupBone( oldent:GetBoneName(i) ) then
+					newsubtable.parent = string.lower( oldent:GetBoneName(i) )
+				end
+			end
+
+			//TODO: If this entity has an adv particle controller effect or beam attached to the model origin and the root bone is attached above, then attach this entity's 
+			//origin relative to the same bone so the effect is in the same place?
+
+			boneinfo[i] = newsubtable
+		end
+		return boneinfo
+	end
+
 	function CreateAdvBonemergeEntity(target, parent, ply, alwaysreplace, keepparentempty, matchnames)
 
 		if !IsValid(target) or target:IsPlayer() or target:IsWorld() or !IsValid(parent) or target == parent or !util.IsValidModel(target:GetModel()) then return end
@@ -127,34 +161,8 @@ if SERVER then
 		newent:SetPEPlus_MergedGrip(oldent.PEPlus_Grip)
 
 		//Create a BoneInfo table - this is used to store bone manipulation info other than the standard Position/Angle/Scale values already available by default
-		local boneinfo = {}
-		for i = -1, oldent:GetBoneCount() - 1 do
-			local newsubtable = {
-				parent = "",
-				//scale = !hasscalemanip, //If the ent we converted has any scale manips, then turn this off by default so the manips look the same as they did before
-				scale = true //never mind, the above functionality is unintuitive, and just leaves people wondering why "scale with target" is defaulting to false
-			}
+		local boneinfo = CreateAdvBoneInfoTable(target, parent, keepparentempty, matchnames)
 
-			if target.AdvBone_BoneInfo and target.AdvBone_BoneInfo[i] then
-				newsubtable.scale = target.AdvBone_BoneInfo[i].scale
-			end
-
-			if !keepparentempty then
-				if target.AdvBone_BoneInfo and target.AdvBone_BoneInfo[i]
-				and ( parent:LookupBone( target.AdvBone_BoneInfo[i].parent ) or target.AdvBone_BoneInfo[i].parent == "" ) then
-					//If oldent was unmerged and already has a BoneInfo table for us to use, then get the value from it, but only if the listed target bone exists/is an empty string
-					newsubtable.parent = target.AdvBone_BoneInfo[i].parent
-				elseif matchnames and i != -1 and parent:LookupBone( oldent:GetBoneName(i) ) then
-					newsubtable.parent = string.lower( oldent:GetBoneName(i) )
-				end
-			end
-
-			//TODO: If this entity has an adv particle controller effect or beam attached to the model origin and the root bone is attached above, then attach this entity's 
-			//origin relative to the same bone so the effect is in the same place?
-
-			boneinfo[i] = newsubtable
-		end
-		//MsgN(target)
 		if !target.AdvBone_BoneInfo then
 			//This value is removed if the boneinfo table is modified or the entity is saved. If the entity is unmerged without the boneinfo table being changed from the default,
 			//it won't save the table, so if the player used the wrong matchnames setting by mistake, they won't be stuck with the table it generated and can just unmerge it, 
@@ -2035,11 +2043,10 @@ if CLIENT then
 
 		end
 
-		panel.bonelist = vgui.Create( "DListView" )
-		panel.bonelist:AddColumn( "Bone" )
-		panel.bonelist:SetMultiSelect( false )
-		panel.bonelist:SetTall(300)
-		panel.bonelist:SortByColumn(1, false)
+		panel.bonelist = panel:AddControl("ListBox", { //note: for reference, this is actually a DListView, not a DListBox
+			Label = "Bone", 
+			Height = 300,
+		})
 
 		local cv_linkicons = GetConVar("advbonemerge_bone_linkicons")
 
@@ -2611,7 +2618,7 @@ if CLIENT then
 			local ent = panel.modellist.selectedent
 			if IsValid(ent) then ent = ent:GetParent() end
 			if IsValid(ent) and ent.AttachedEntity then ent = ent.AttachedEntity end
-			for k, v in pairs ( self.Choices ) do
+			for k, v in pairs (self.Choices) do
 				local option = self.Menu:AddOption( v, function() self:ChooseOption( v, k ) end )
 				if panel.targetbonelist.selectedtargetbone == self.Data[k] then option:SetChecked(true) end  //check the currently selected target bone
 
