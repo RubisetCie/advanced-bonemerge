@@ -15,9 +15,15 @@ local math = math
 local angle_zero = angle_zero
 local vector_origin = vector_origin
 
+//this convar has to be shared between advbone and animprop, because both addons' BuildBonePositions functions need to match 
+//the time interval used by advbone's AdvBone_ResetBoneChangeTimeOnChildren function, but it also still needs to work properly 
+//if animprop uses it without advbone installed (i.e. when remapping). this means a single line of duplicate code, lame!
+local cv_sleep = CreateConVar("sv_advbone_sleep", 0.1, {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Time interval used by ent_advbonemerge and prop_animated to enter sleep mode - if the entity's bones haven't changed position for this long, then fall asleep and stop building new bone positions to save perf, until woken up by entity movement, parent bone movement, etc.", 0, 1) 
+
 function ENT:SetupDataTables()
 
 	self:NetworkVar("Bool", 0, "PEPlus_MergedGrip")
+	self:NetworkVar("Bool", 1, "Invert")
 
 end
 
@@ -141,16 +147,17 @@ if CLIENT then
 			//If our bones haven't changed position in a while, then fall asleep and skip until one of our parent's bones moves,
 			//or until we/our parent get bonemanipped (see function overrides at bottom of this page)
 			//This check isn't the cheapest, but it's still a whole lot better than updating all our bones.
-			if self.LastBoneChangeTime + (FrameTime() * 10) < curtime then
+			if self.AdvBone_AllowSleep and self.LastBoneChangeTime + cv_sleep:GetFloat() < curtime then
 				if parent.AdvBone_LastParentBoneCheckTime and parent.AdvBone_LastParentBoneCheckTime >= curtime then
 					//This check only needs to be performed once per frame, even if there are multiple models merged to one parent
 					skip = true
 				else
-					//Don't bother doing this if the parent has significantly more bones than we do
 					local parbonecount = parent:GetBoneCount()
-					if parbonecount / 2 <= bonecount then
+					//If our parent's bonecount is so much higher than our bonecount that doing this wakeup check
+					//would be *more expensive* than building our own bone positions, then don't bother doing this
+					if bonecount + 1 > parbonecount / 7 then //parent has over 7x more bones than us, including our origin manip
 						local parentbones = {}
-						for i = -1, parbonecount - 1 do
+						for i = 0, parbonecount - 1 do
 							local matr = parent:GetBoneMatrix(i)
 							if ismatrix(matr) then
 								//parentbones[i] = matr:ToTable() //this func suuucks for perf when there's a lot at once
@@ -174,6 +181,7 @@ if CLIENT then
 							for k, v in pairs (self.SavedParentBoneMatrices) do
 								if !parentbones[k] then
 									ParentNoChange = false
+									break
 								elseif ParentNoChange then
 									for k2, v2 in pairs (v) do
 										if ParentNoChange then
@@ -198,12 +206,12 @@ if CLIENT then
 						else
 							self.SavedParentBoneMatrices = parentbones
 						end
-						skip = true //TODO: saw this when looking through code, is this right? it's not here in prop_animated, is this to cover spme edge case i forgot to comment? doesn't seem to be causing problems.
 					end
 				end
 			else
 				self.SavedParentBoneMatrices = nil
 			end
+			self.AdvBone_Asleep = skip //this tells the think func to stop calculating render bounds
 		end
 
 		//If we're going to skip, then use cached bone matrices instead of computing new ones, and stop here
@@ -224,10 +232,8 @@ if CLIENT then
 					self:SetBoneMatrix(i, self.SavedBoneMatrices[i])
 				end
 			end
-			self.AdvBone_Asleep = true //this tells the think func to stop calculating render bounds
 			return
 		end
-		self.AdvBone_Asleep = nil
 
 		//Catch errors caused by changing the entity's model:
 		//1: If the model has changed, DefaultBoneOffsets will be incorrect, so recreate them
@@ -359,7 +365,7 @@ if CLIENT then
 
 					matr = targetmatr
 
-					if (self.AdvBone_BoneInfo[i].scale == false) then
+					if !self.AdvBone_BoneInfo[i].scale then
 						//Since we don't want to use the target bone's scale, rescale the matrix so it's back to normal
 						matr:SetScale(mdlsclvec)  //we still want to inherit the overall model scale for things like npcs and animated props
 
@@ -411,7 +417,7 @@ if CLIENT then
 					//Create a matrix for the model origin
 					matr = Matrix()
 					//If our origin isn't following a bone, then that means it's actually following the parent's origin, so inherit origin manip stuff from it
-					if parent.AdvBone_OriginMatrix and self.AdvBone_BoneInfo[i].scale != false then
+					if parent.AdvBone_OriginMatrix and self.AdvBone_BoneInfo[i].scale then
 						matr:Set(parent.AdvBone_OriginMatrix)
 					
 						matr:Translate(self:GetManipulateBonePosition(-1))
@@ -461,7 +467,7 @@ if CLIENT then
 					end
 				
 					if parentmatr then
-						if (self.AdvBone_BoneInfo[i].scale != false) then
+						if self.AdvBone_BoneInfo[i].scale then
 							//Start off with the parent bone matrix
 							matr = parentmatr
 
@@ -603,6 +609,12 @@ if CLIENT then
 		if BonesHaveChanged then
 			self.LastBoneChangeTime = curtime
 		end
+		//As a failsafe, if FPS is low enough to make the frame time longer than sv_advbone_sleep (<10 FPS by default), then make sure 
+		//to compare at *least* two frames to try to make sure that our parent ent's bones have stopped moving around - otherwise, we'll 
+		//update bones once, and then fall asleep in the very next frame without checking. This is bad because it can cause this model to 
+		//freeze intermittently while the parent animates (i.e. gun attachments on a character playing a subtle idle animation), or fall 
+		//asleep in a position out-of-sync with the parent (i.e. bones merged to jigglebones)
+		self.AdvBone_AllowSleep = !BonesHaveChanged
 	end
 
 	function ENT:CalcAbsolutePosition(pos, ang)
@@ -674,7 +686,7 @@ if SERVER then
 		net.Start("AdvBone_EntBoneInfoTable_SendToCl", true)
 			net.WriteEntity(ent)
 
-			net.WriteInt(table.Count(ent.AdvBone_BoneInfo), 9)
+			net.WriteUInt(table.Count(ent.AdvBone_BoneInfo), 9) //note: this has an extra bit because a merged ent with max bones (0 to 254, plus our -1 origin manip) has a count of 256, just 1 over the limit of 255
 			for key, entry in pairs (ent.AdvBone_BoneInfo) do
 				net.WriteInt(key, 9)
 
@@ -692,7 +704,7 @@ if SERVER then
 			net.WriteBool(domanips)
 			if domanips then
 				//PrintTable(ent.AdvBone_BoneManips)
-				net.WriteInt(table.Count(ent.AdvBone_BoneManips), 9)
+				net.WriteUInt(table.Count(ent.AdvBone_BoneManips), 9) //note: this has an extra bit because a merged ent with max bones (0 to 254, plus our -1 origin manip) has a count of 256, just 1 over the limit of 255
 				for boneID, tab in pairs (ent.AdvBone_BoneManips) do
 					net.WriteInt(boneID, 9)
 					net.WriteBool(tab.p)
@@ -738,7 +750,7 @@ if CLIENT then
 		end
 
 		//new BoneInfo table
-		local count = net.ReadInt(9)
+		local count = net.ReadUInt(9)
 		local tab = {}
 		for i = 1, count do
 			local key = net.ReadInt(9)
@@ -761,7 +773,7 @@ if CLIENT then
 		//first-time AdvBone_BoneManips table
 		local tab2
 		if net.ReadBool() then
-			local count = net.ReadInt(9)
+			local count = net.ReadUInt(9)
 			tab2 = {}
 			for i = 1, count do
 				local key = net.ReadInt(9)
@@ -900,7 +912,7 @@ if CLIENT then
 
 					matr = targetmatr
 
-					if (self.AdvBone_BoneInfo[0].scale == false) then
+					if !self.AdvBone_BoneInfo[0].scale then
 						//Since we don't want to use the target bone's scale, rescale the matrix so it's back to normal
 						matr:SetScale(mdlsclvec)  //we still want to inherit the overall model scale for things like npcs and animated props
 
@@ -953,7 +965,7 @@ if CLIENT then
 				//Create a matrix for the model origin
 				matr = Matrix()
 				//If our origin isn't following a bone, then that means it's actually following the parent's origin, so inherit origin manip stuff from it
-				if parent.AdvBone_OriginMatrix and self.AdvBone_BoneInfo[0].scale != false then
+				if parent.AdvBone_OriginMatrix and self.AdvBone_BoneInfo[0].scale then
 					matr:Set(parent.AdvBone_OriginMatrix)
 					
 					matr:Translate(self:GetManipulateBonePosition(0))
@@ -1013,9 +1025,25 @@ if CLIENT then
 				self.AdvBone_OriginMatrix = self.AdvBone_StaticPropMatrix //things following the origin should use this matrix too
 
 
-				local matrscl = matr:GetScale()
 				local mergedgrip = self:GetPEPlus_MergedGrip()
-				if !mergedgrip and (self.AdvBone_StaticPropUsedRenderMultiply or Vector(math.Round(matrscl.x,4),math.Round(matrscl.y,4),math.Round(matrscl.z,4)) != mdlsclvec) then
+				if !mergedgrip and !self.AdvBone_StaticPropUsedRenderMultiply then
+					local matrscl = matr:GetScale()
+					if Vector(math.Round(matrscl.x,4),math.Round(matrscl.y,4),math.Round(matrscl.z,4)) != mdlsclvec then
+						//If the matr's scale is different from the model scale, then we need to apply scale using RenderMultiply
+						self.AdvBone_StaticPropUsedRenderMultiply = true
+					else
+						//The above check doesn't catch negative scales because matr:GetScale() always returns absolute values (i.e. bones 
+						//with scale manip 1,-1,1 still return matrscl 1,1,1). This means static_prop bones that are mirrored on an axis 
+						//but otherwise unscaled won't get applied with RenderMultiply unless we catch them with a separate check here.
+						local a, b, c = matr:GetField(1,1), matr:GetField(1,2), matr:GetField(1,3)
+						local d, e, f = matr:GetField(2,1), matr:GetField(2,2), matr:GetField(2,3)
+						local g, h, i = matr:GetField(3,1), matr:GetField(3,2), matr:GetField(3,3)
+						if (a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)) <= 0 then //get the determinant (https://stackoverflow.com/questions/9455298/3x3-matrix-determinant-function-making-it-faster); this will be negative if the matr scale is negative on 1 or 3 axes (https://discussions.unity.com/t/need-help-supporting-negative-values-when-extracting-scale-from-4x4-transform-matrix/102706/2)
+							self.AdvBone_StaticPropUsedRenderMultiply = true
+						end
+					end
+				end
+				if !mergedgrip and self.AdvBone_StaticPropUsedRenderMultiply then
 					//Because EnableMatrix's scale is multiplicative, we actually need to counteract the model scale before applying it to ourselves or else it'll be doubled
 					matr:SetScale( Vector(ourscale.x / mdlscl, ourscale.y / mdlscl, ourscale.z / mdlscl) )
 
@@ -1079,6 +1107,12 @@ if CLIENT then
 			end
 		end
 
+
+		if !self:IsEffectActive(EF_BONEMERGE) then
+			self:AddEffects(EF_BONEMERGE)
+			self:AddEffects(EF_BONEMERGE_FASTCULL)
+		end
+
 		self:NextThink(curtime)
 
 	end
@@ -1093,7 +1127,7 @@ if CLIENT then
 		AdvBone_IsSkyboxDrawing = false
 	end)
 
-	CreateClientConVar("cl_advbone_debug_sleep", 0, false, false, "If 1, show sleep status of ent_advbonemerge's BuildBonePositions function (red = asleep, green = awake)", 0, 1)
+	CreateClientConVar("cl_advbone_debug_sleep", 0, false, false, "If 1, show sleep status of ent_advbonemerge and prop_animated's BuildBonePositions function (red = asleep, green = awake, no color = not running BuildBonePositions)", 0, 1)
 	local cv_debug_sleep = GetConVar("cl_advbone_debug_sleep")
 
 	function ENT:Draw(flag)
@@ -1141,12 +1175,15 @@ if CLIENT then
 		if cv_debug_sleep:GetBool() then
 			if self.AdvBone_Asleep then
 				render.SetColorModulation(1,0,0)
-			else
+			elseif self.AdvBone_Asleep == false then
 				render.SetColorModulation(0,1,0)
 			end
+			//if self.AdvBone_Asleep is nil (BuildBonePositions isn't running), then don't change color
 		end
 
+		if self:GetInvert() then render.CullMode(MATERIAL_CULLMODE_CW) end
 		self:DrawModel()
+		render.CullMode(MATERIAL_CULLMODE_CCW)
 		self.HasDrawn = true //fix: don't let buildbonepositions fall asleep if we spawned offscreen and haven't been seen by the client yet, otherwise it'll save bad bone positions
 
 	end
@@ -1505,11 +1542,9 @@ AdvBone_ResetBoneChangeTimeOnChildren = function(ent, networking) //global func 
 			local class = ent2:GetClass()
 			if class == "ent_advbonemerge" or class == "prop_animated" then
 				//Limit how often the server sends this to clients; multiple bone manips at once or ragdoll movements i.e. Stop Motion Helper will run this several times per frame
-				//TODO: can we delay this longer? the client waits until 10 *frames* after LastBoneChangeTime to let BuildBonePositions fall asleep, which of course isn't consistent with server 
-				//tickrate at all, so i don't know how we'd add any more of a delay without potentially breaking things for players with an insanely high framerate.
 				local time = CurTime()
 				ent.AdvBone_ResetBoneChangeTimeOnChildren_LastSent = ent.AdvBone_ResetBoneChangeTimeOnChildren_LastSent or time
-				if time > ent.AdvBone_ResetBoneChangeTimeOnChildren_LastSent then
+				if time > ent.AdvBone_ResetBoneChangeTimeOnChildren_LastSent + cv_sleep:GetFloat() then
 					ent.AdvBone_ResetBoneChangeTimeOnChildren_LastSent = time
 					net.Start("AdvBone_ResetBoneChangeTimeOnChildren_SendToCl", true)
 						net.WriteEntity(ent)
